@@ -1,0 +1,752 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!--PWA-->
+<meta name="theme-color" content="#152028">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Lane Line">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<!--/PWA-->
+<title>Lane Line</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: one narrow column you can hold in one hand at the lane; sticky tab bar; big steppers; a top-down lane drawing in boards. */
+:root{
+  --bg:#edf0f2; --surface:#ffffff; --surface-2:#f4f6f8; --ink:#152028; --muted:#56646e; --rule:#d3dadf;
+  --accent:#c42b3a; --accent-ink:#ffffff; --accent-soft:#f6dfe1;
+  --ball:#2347b8; --ball-2:#93a3d8;
+  --maple:#e3c08b; --maple-line:#cfa66d; --gutter:#3a4046; --mark:#3b2814;
+  --pin:#ffffff; --pin-down:#cfd6db; --pin-stroke:#152028; --pin-text:#152028;
+  --good:#1d7f47; --warn:#9a5a00;
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light;
+  padding-top:env(safe-area-inset-top, 0px);padding-bottom:env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0d1215; --surface:#151c21; --surface-2:#1b242a; --ink:#e5ebee; --muted:#95a3ad; --rule:#29343c;
+  --accent:#ff5d68; --accent-ink:#1a0306; --accent-soft:#3a1a1e;
+  --ball:#8aabff; --ball-2:#4d5f96;
+  --maple:#6f5331; --maple-line:#5b4326; --gutter:#06090b; --mark:#f1ddb8;
+  --pin:#f4f6f7; --pin-down:#2f3b44; --pin-stroke:#0d1215; --pin-text:#152028;
+  --good:#4fc98a; --warn:#f0a640; color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0d1215; --surface:#151c21; --surface-2:#1b242a; --ink:#e5ebee; --muted:#95a3ad; --rule:#29343c;
+  --accent:#ff5d68; --accent-ink:#1a0306; --accent-soft:#3a1a1e;
+  --ball:#8aabff; --ball-2:#4d5f96;
+  --maple:#6f5331; --maple-line:#5b4326; --gutter:#06090b; --mark:#f1ddb8;
+  --pin:#f4f6f7; --pin-down:#2f3b44; --pin-stroke:#0d1215; --pin-text:#152028;
+  --good:#4fc98a; --warn:#f0a640; color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.45;-webkit-tap-highlight-color:transparent;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:0 32px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top, 0px);z-index:10;background:var(--bg)}
+.wrap{max-width:560px;margin:0 auto}
+h1,h2,h3{font-family:var(--f-display);font-weight:700;letter-spacing:.01em;text-wrap:balance;margin:0}
+h2{font-size:1.5rem;line-height:1.1}
+h3{font-size:1.1rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+p{margin:0}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--ball);outline-offset:2px}
+
+/* header */
+.top{position:sticky;top:env(safe-area-inset-top, 0px);z-index:5;background:var(--bg);padding-top:12px;border-bottom:1px solid var(--rule)}
+.brand{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 12px}
+.mark{font-family:var(--f-display);font-weight:700;font-size:1.9rem;letter-spacing:.04em;line-height:1}
+.mark b{color:var(--accent)}
+.tag{font-size:.85rem;color:var(--muted)}
+.tabs{display:flex;gap:4px;overflow-x:auto;margin-top:10px;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:1 0 auto;min-width:64px;background:none;border:0;border-bottom:3px solid transparent;padding:10px 8px 9px;
+  font-family:var(--f-display);font-weight:600;font-size:1.05rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+
+main{display:block;padding-top:16px}
+.view{display:grid;gap:14px}
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:14px;display:grid;gap:12px;min-width:0}
+.lead{color:var(--muted);font-size:.95rem}
+
+/* steppers and fields */
+.steppers{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.stepper,.field{display:grid;gap:4px;min-width:0;align-content:start}
+.stepper label,.field label{font-size:.8rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+.stepper .row{display:grid;grid-template-columns:44px 1fr 44px;border:1px solid var(--rule);border-radius:10px;overflow:hidden;background:var(--surface-2)}
+.stepper button{border:0;background:none;font-size:1.4rem;line-height:1;height:46px}
+.stepper button:active{background:var(--rule)}
+.stepper input{width:100%;min-width:0;border:0;background:var(--surface);text-align:center;font-family:var(--f-mono);font-size:1.25rem;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+.stepper small{font-size:.78rem;color:var(--muted)}
+.field input{height:46px;width:100%;min-width:0;border:1px solid var(--rule);border-radius:10px;background:var(--surface);color:var(--ink);padding:0 12px;font:inherit;font-size:1rem}
+
+/* five points */
+.points{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.pt{background:var(--surface-2);border-radius:10px;padding:8px 4px;text-align:center;display:grid;gap:2px;min-width:0}
+.pt span{font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+.pt b{font-family:var(--f-mono);font-size:1.3rem;font-variant-numeric:tabular-nums}
+.pt.key{background:var(--accent-soft);box-shadow:inset 0 0 0 2px var(--accent)}
+.callout{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.big{display:grid;gap:2px;padding:10px 12px;border-radius:10px;background:var(--surface-2)}
+.big span{font-size:.8rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+.big b{font-family:var(--f-mono);font-size:2.2rem;line-height:1.05;font-variant-numeric:tabular-nums}
+.big.hot{background:var(--accent);color:var(--accent-ink)}
+.big.hot span{color:inherit;opacity:.85}
+
+/* lane */
+.lane{display:flex;justify-content:center;overflow-x:auto}
+.lane svg{width:100%;max-width:340px;height:auto;display:block}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:.8rem;color:var(--muted);justify-content:center}
+.legend i{display:inline-block;width:18px;height:3px;border-radius:2px;vertical-align:middle;margin-right:6px;background:var(--ball)}
+.legend i.old{background:none;border-top:2px dashed var(--ball-2);height:0}
+
+/* chips */
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--rule);background:var(--surface-2);border-radius:999px;padding:8px 12px;font-weight:600;font-size:.9rem}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn{border:0;border-radius:10px;padding:12px 16px;font-weight:600;background:var(--accent);color:var(--accent-ink);display:inline-flex;align-items:center}
+.btn.quiet{background:var(--surface-2);color:var(--ink);border:1px solid var(--rule)}
+.btnrow{display:flex;flex-wrap:wrap;gap:8px}
+.verdict{font-weight:600}
+.hint{font-size:.9rem;color:var(--muted)}
+.hint b{color:var(--ink)}
+
+/* pin deck */
+.deck{display:grid;gap:8px;justify-items:center;padding:6px 0}
+.deck .r{display:flex;gap:14px}
+.pinb{width:50px;height:50px;border-radius:50%;border:2px solid var(--pin-stroke);background:var(--pin);position:relative;
+  font-family:var(--f-mono);font-weight:700;font-size:1rem;color:var(--pin-text);padding-top:10px}
+.pinb::after{content:"";position:absolute;left:12px;right:12px;top:8px;height:4px;border-radius:2px;background:var(--accent)}
+.pinb[aria-pressed="false"]{background:transparent;border:2px dashed var(--pin-down);color:var(--muted)}
+.pinb[aria-pressed="false"]::after{display:none}
+.pill{display:inline-block;font-size:.75rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:999px;background:var(--surface-2);border:1px solid var(--rule)}
+.pill.split{background:var(--warn);color:var(--bg);border-color:var(--warn)}
+.pill.hook{background:var(--ball);color:var(--bg);border-color:var(--ball)}
+.leave-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.leave-name{font-family:var(--f-display);font-weight:700;font-size:2rem;line-height:1}
+ul.notes{margin:0;padding-left:18px;display:grid;gap:6px}
+
+/* checklists */
+.check{display:grid;gap:2px}
+.check label{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--rule)}
+.check label:last-child{border-bottom:0}
+.check input{width:22px;height:22px;margin-top:1px;accent-color:var(--accent);flex:none}
+
+/* log */
+.seg{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--rule);border-radius:10px;overflow:hidden}
+.seg button{border:0;background:var(--surface-2);padding:10px;font-weight:600}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.loglist{display:grid;gap:0}
+.logrow{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--rule);font-size:.92rem}
+.logrow .n{font-family:var(--f-mono);color:var(--muted);font-size:.85rem}
+.logrow .res{font-weight:600}
+.logrow .res.ok{color:var(--good)} .logrow .res.miss{color:var(--accent)}
+.logrow .x{background:none;border:0;color:var(--muted);font-size:1.2rem;width:36px;height:36px}
+.empty{color:var(--muted);font-size:.92rem;padding:8px 0}
+textarea.copybox{width:100%;min-height:120px;font-family:var(--f-mono);font-size:.8rem;background:var(--surface-2);color:var(--ink);border:1px solid var(--rule);border-radius:8px;padding:8px}
+.confirm{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.src{font-size:.85rem;color:var(--muted)}
+.src a{color:var(--ball)}
+
+/* history */
+.alltime{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.night{border-top:1px solid var(--rule)}
+.night summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:12px 0;align-items:center}
+.night summary::-webkit-details-marker{display:none}
+.night summary::after{content:"+";grid-column:2;grid-row:1 / span 2;font-family:var(--f-mono);font-size:1.2rem;color:var(--muted)}
+.night[open] summary::after{content:"−"}
+.nd{font-weight:600}
+.ns{font-size:.85rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.nbody{display:grid;gap:8px;padding-bottom:12px}
+.nmeta{font-size:.9rem}
+@media (max-width:380px){ .pt b{font-size:1.1rem} .big b{font-size:1.8rem} .pinb{width:44px;height:44px} }
+@media (prefers-reduced-motion: reduce){ *{transition:none!important} }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+<header class="top">
+  <div class="brand">
+    <div class="mark">LANE <b>LINE</b></div>
+    <div class="tag" id="tag">Righty · drift +2 · layoff 6</div>
+  </div>
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button class="tab" role="tab" data-tab="line" id="t-line">Line</button>
+    <button class="tab" role="tab" data-tab="moves" id="t-moves">Moves</button>
+    <button class="tab" role="tab" data-tab="spares" id="t-spares">Spares</button>
+    <button class="tab" role="tab" data-tab="body" id="t-body">Body</button>
+    <button class="tab" role="tab" data-tab="log" id="t-log">Log</button>
+    <button class="tab" role="tab" data-tab="setup" id="t-setup">My numbers</button>
+  </nav>
+</header>
+
+<main>
+<!-- LINE -->
+<section class="view" id="v-line" hidden>
+  <div class="card">
+    <h2>Pick your break point, get your feet</h2>
+    <p class="lead">Set where you want the ball at the break point and the arrow you will look at. Lane Line works backward to your slide and start boards.</p>
+    <div class="steppers">
+      <div class="stepper" data-path="line.bp" data-step="1" data-min="1" data-max="39"><label for="in-bp">Break point board</label><div class="row"><button type="button" data-d="-1" aria-label="Break point down">−</button><input id="in-bp" inputmode="decimal"><button type="button" data-d="1" aria-label="Break point up">+</button></div></div>
+      <div class="stepper" data-path="line.arrows" data-step="1" data-min="1" data-max="39"><label for="in-ar">Arrows board</label><div class="row"><button type="button" data-d="-1" aria-label="Arrows down">−</button><input id="in-ar" inputmode="decimal"><button type="button" data-d="1" aria-label="Arrows up">+</button></div></div>
+      <div class="stepper" data-path="line.dist" data-step="1" data-min="30" data-max="55"><label for="in-dist">Break point distance (ft)</label><div class="row"><button type="button" data-d="-1" aria-label="Distance down">−</button><input id="in-dist" inputmode="decimal"><button type="button" data-d="1" aria-label="Distance up">+</button></div><small>45 fits most house shots</small></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="callout">
+      <div class="big hot"><span>Stand on</span><b class="num" id="o-start">23</b></div>
+      <div class="big"><span>Look at</span><b class="num" id="o-look">15</b></div>
+    </div>
+    <div class="points">
+      <div class="pt key"><span>Start</span><b id="p-start">23</b></div>
+      <div class="pt"><span>Slide</span><b id="p-slide">25</b></div>
+      <div class="pt"><span>Lay down</span><b id="p-lay">19</b></div>
+      <div class="pt key"><span>Arrows</span><b id="p-ar">15</b></div>
+      <div class="pt"><span>Break pt</span><b id="p-bp">7</b></div>
+    </div>
+    <div class="steppers">
+      <div class="stepper" data-path="p.layoff" data-step="0.5" data-min="0" data-max="15"><label for="in-layoff2">Layoff (boards)</label><div class="row"><button type="button" data-d="-1" aria-label="Layoff down">−</button><input id="in-layoff2" inputmode="decimal"><button type="button" data-d="1" aria-label="Layoff up">+</button></div><small>Slide toe to where the ball lands</small></div>
+      <div class="stepper" data-path="p.loft" data-step="0.5" data-min="0" data-max="6"><label for="in-loft2">Lay down distance (ft)</label><div class="row"><button type="button" data-d="-1" aria-label="Lay down distance down">−</button><input id="in-loft2" inputmode="decimal"><button type="button" data-d="1" aria-label="Lay down distance up">+</button></div><small>How far past the foul line it lands</small></div>
+    </div>
+    <p class="hint" id="o-check">After the shot, look down. You should be sliding on <b>25</b>.</p>
+  </div>
+  <div class="card">
+    <div class="lane" id="lane-line"></div>
+    <div class="legend"><span><i></i>Ball path</span><span id="lg-board1">Board 1 is the right gutter</span></div>
+  </div>
+</section>
+
+<!-- MOVES -->
+<section class="view" id="v-moves" hidden>
+  <div class="card">
+    <h2>Make a move</h2>
+    <p class="lead" id="mv-cur">Current line: stand 23, look 15, break point 7.</p>
+    <div class="chips" id="mv-presets"></div>
+    <div class="steppers">
+      <div class="stepper" data-path="mv.feet" data-step="1" data-min="-15" data-max="15"><label for="in-feet" id="lbl-feet">Feet (+ = left)</label><div class="row"><button type="button" data-d="-1" aria-label="Feet out">−</button><input id="in-feet" inputmode="decimal"><button type="button" data-d="1" aria-label="Feet in">+</button></div></div>
+      <div class="stepper" data-path="mv.eyes" data-step="1" data-min="-15" data-max="15"><label for="in-eyes" id="lbl-eyes">Eyes (+ = left)</label><div class="row"><button type="button" data-d="-1" aria-label="Eyes out">−</button><input id="in-eyes" inputmode="decimal"><button type="button" data-d="1" aria-label="Eyes in">+</button></div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="callout">
+      <div class="big hot"><span>New stand</span><b class="num" id="m-start">23</b></div>
+      <div class="big"><span>New look</span><b class="num" id="m-look">15</b></div>
+    </div>
+    <div class="points">
+      <div class="pt"><span>Start</span><b id="mp-start">23</b></div>
+      <div class="pt"><span>Slide</span><b id="mp-slide">25</b></div>
+      <div class="pt"><span>Lay down</span><b id="mp-lay">19</b></div>
+      <div class="pt"><span>Arrows</span><b id="mp-ar">15</b></div>
+      <div class="pt key"><span>Break pt</span><b id="mp-bp">7</b></div>
+    </div>
+    <p class="verdict" id="m-verdict">No move yet.</p>
+    <div class="btnrow"><button class="btn" id="m-apply" type="button">Use this line</button><button class="btn quiet" id="m-reset" type="button">Clear move</button></div>
+  </div>
+  <div class="card">
+    <div class="lane" id="lane-moves"></div>
+    <div class="legend"><span><i class="old"></i>Current line</span><span><i></i>After the move</span></div>
+  </div>
+  <div class="card">
+    <h3>Which way to move</h3>
+    <p class="hint" id="mv-why"></p>
+    <p class="hint"><b>Rule of thumb:</b> eyes about two thirds of your feet keeps the same break point. A 3 and 2 holds it; a 2 and 1 opens it about 1 board.</p>
+  </div>
+</section>
+
+<!-- SPARES -->
+<section class="view" id="v-spares" hidden>
+  <div class="card">
+    <h2>What's standing?</h2>
+    <p class="lead">Tap the pins left on the deck. Same target, move your feet.</p>
+    <div class="deck" id="deck"></div>
+    <div class="chips" id="sp-quick"></div>
+  </div>
+  <div class="card" id="sp-result"></div>
+  <div class="card">
+    <div class="lane" id="lane-spare"></div>
+    <div class="legend"><span><i></i>Spare line through your target</span></div>
+  </div>
+</section>
+
+<!-- BODY -->
+<section class="view" id="v-body" hidden>
+  <div class="card"><h2>Before you step up</h2><p class="lead">Square to your line, same setup every time, and hold your finish so you can read your slide. Ticks clear when you reload, so run them each frame.</p></div>
+  <div class="card"><h3>Strike shot</h3><div class="check" id="ck-strike"></div></div>
+  <div class="card"><h3 id="h-near">Right-side spares</h3><div class="check" id="ck-near"></div></div>
+  <div class="card"><h3 id="h-far">Left-side spares</h3><div class="check" id="ck-far"></div></div>
+  <div class="card"><h3>Cues</h3>
+    <ul class="notes">
+      <li>A spare is a free throw: slide spot plus target, nothing else.</li>
+      <li>Don't count the pins in front of you. Think point A to point B.</li>
+      <li>Missed? Check your slide board before you change your target.</li>
+      <li>Splits: take the count unless the match is on the line.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- LOG -->
+<section class="view" id="v-log" hidden>
+  <div class="card">
+    <h2>Log a shot</h2>
+    <div class="seg" role="group" aria-label="Shot type"><button type="button" data-kind="strike" aria-pressed="true">First ball</button><button type="button" data-kind="spare" aria-pressed="false">Spare</button></div>
+    <div class="steppers">
+      <div class="stepper" data-path="form.start" data-step="1" data-min="1" data-max="45"><label for="in-lstart">Started on</label><div class="row"><button type="button" data-d="-1" aria-label="Start down">−</button><input id="in-lstart" inputmode="decimal"><button type="button" data-d="1" aria-label="Start up">+</button></div></div>
+      <div class="stepper" data-path="form.slide" data-step="1" data-min="1" data-max="45"><label for="in-lslide">Slid on</label><div class="row"><button type="button" data-d="-1" aria-label="Slide down">−</button><input id="in-lslide" inputmode="decimal"><button type="button" data-d="1" aria-label="Slide up">+</button></div></div>
+      <div class="stepper" data-path="form.arrows" data-step="1" data-min="1" data-max="39"><label for="in-lar">Crossed arrows at</label><div class="row"><button type="button" data-d="-1" aria-label="Arrows down">−</button><input id="in-lar" inputmode="decimal"><button type="button" data-d="1" aria-label="Arrows up">+</button></div></div>
+    </div>
+    <div class="chips" id="lg-results"></div>
+    <div class="btnrow"><button class="btn" id="lg-save" type="button">Save shot</button><button class="btn quiet" id="lg-prefill" type="button">Fill from my line</button></div>
+    <p class="hint" id="lg-msg" aria-live="polite"></p>
+  </div>
+  <div class="card">
+    <div class="leave-head"><h3>Tonight</h3><span class="pill" id="tn-date">Today</span></div>
+    <div class="steppers">
+      <div class="field"><label for="in-lanes">Lanes</label><input id="in-lanes" type="text" placeholder="17-18" autocomplete="off"></div>
+      <div class="field"><label for="in-notes">Notes</label><input id="in-notes" type="text" placeholder="Pattern, ball, what worked" autocomplete="off"></div>
+    </div>
+    <div class="stats">
+      <div class="pt"><span>Shots</span><b id="st-n">0</b></div>
+      <div class="pt"><span>Drift</span><b id="st-drift">–</b></div>
+      <div class="pt"><span>Strike %</span><b id="st-x">–</b></div>
+      <div class="pt"><span>Spare %</span><b id="st-sp">–</b></div>
+    </div>
+    <div class="btnrow"><button class="btn quiet" id="st-usedrift" type="button" hidden>Use this drift</button></div>
+    <div class="loglist" id="lg-list"></div>
+    <div class="btnrow"><button class="btn quiet" id="lg-copy" type="button">Copy tonight</button><button class="btn quiet" id="lg-clear" type="button">Clear tonight</button></div>
+    <div class="confirm" id="lg-confirm" hidden><span>Delete every shot from tonight?</span><button class="btn" id="lg-yes" type="button">Delete</button><button class="btn quiet" id="lg-no" type="button">Keep</button></div>
+  </div>
+  <div class="card">
+    <h3>Past nights</h3>
+    <div class="alltime" id="all-stats">
+      <div class="pt"><span>Nights</span><b id="at-nights">0</b></div>
+      <div class="pt"><span>Drift</span><b id="at-drift">–</b></div>
+      <div class="pt"><span>Strike %</span><b id="at-x">–</b></div>
+      <div class="pt"><span>Spare %</span><b id="at-sp">–</b></div>
+    </div>
+    <div id="hist"></div>
+  </div>
+  <div class="card">
+    <h3>Backup</h3>
+    <p class="hint" id="store-msg">Everything saves on this phone as you go.</p>
+    <div class="btnrow">
+      <button class="btn quiet" id="bk-export" type="button">Save backup file</button>
+      <button class="btn quiet" id="bk-copy" type="button">Copy backup</button>
+      <label class="btn quiet" for="bk-file">Restore backup</label>
+      <input type="file" id="bk-file" accept="application/json,.json" hidden>
+    </div>
+    <textarea class="copybox" id="lg-copybox" hidden readonly aria-label="Copied text"></textarea>
+  </div>
+</section>
+
+<!-- SETUP -->
+<section class="view" id="v-setup" hidden>
+  <div class="card">
+    <h2>My numbers</h2>
+    <p class="lead">Measure these in practice. They save on this phone. Defaults come from the videos (Keith from Bald Brothers Bowling for drift and layoff, Darren Tang for spare spots).</p>
+    <div class="seg" role="group" aria-label="Bowling hand"><button type="button" data-hand="R" aria-pressed="true">Right-handed</button><button type="button" data-hand="L" aria-pressed="false">Left-handed</button></div>
+    <div class="steppers">
+      <div class="stepper" data-path="p.drift" data-step="0.5" data-min="-15" data-max="15"><label for="in-drift">Drift (boards)</label><div class="row"><button type="button" data-d="-1" aria-label="Drift down">−</button><input id="in-drift" inputmode="decimal"><button type="button" data-d="1" aria-label="Drift up">+</button></div><small id="sm-drift">Slide minus start. + means toward the middle.</small></div>
+      <div class="stepper" data-path="p.layoff" data-step="0.5" data-min="0" data-max="15"><label for="in-layoff">Layoff (boards)</label><div class="row"><button type="button" data-d="-1" aria-label="Layoff down">−</button><input id="in-layoff" inputmode="decimal"><button type="button" data-d="1" aria-label="Layoff up">+</button></div><small>Center of slide toe to where the ball lands</small></div>
+      <div class="stepper" data-path="p.loft" data-step="0.5" data-min="0" data-max="6"><label for="in-loft">Lay down distance (ft)</label><div class="row"><button type="button" data-d="-1" aria-label="Lay down distance down">−</button><input id="in-loft" inputmode="decimal"><button type="button" data-d="1" aria-label="Lay down distance up">+</button></div><small>How far past the foul line the ball lands. 0 if you set it down at the line.</small></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Spare spots</h3>
+    <div class="steppers">
+      <div class="stepper" data-path="p.sH" data-step="0.5" data-min="1" data-max="45"><label for="in-sH" id="lbl-sH">10 pin: stand</label><div class="row"><button type="button" data-d="-1" aria-label="Down">−</button><input id="in-sH" inputmode="decimal"><button type="button" data-d="1" aria-label="Up">+</button></div></div>
+      <div class="stepper" data-path="p.tH" data-step="0.5" data-min="1" data-max="39"><label for="in-tH" id="lbl-tH">10 pin: look</label><div class="row"><button type="button" data-d="-1" aria-label="Down">−</button><input id="in-tH" inputmode="decimal"><button type="button" data-d="1" aria-label="Up">+</button></div></div>
+      <div class="stepper" data-path="p.sO" data-step="0.5" data-min="1" data-max="45"><label for="in-sO" id="lbl-sO">7 pin: stand</label><div class="row"><button type="button" data-d="-1" aria-label="Down">−</button><input id="in-sO" inputmode="decimal"><button type="button" data-d="1" aria-label="Up">+</button></div></div>
+      <div class="stepper" data-path="p.tO" data-step="0.5" data-min="1" data-max="39"><label for="in-tO" id="lbl-tO">7 pin: look</label><div class="row"><button type="button" data-d="-1" aria-label="Down">−</button><input id="in-tO" inputmode="decimal"><button type="button" data-d="1" aria-label="Up">+</button></div></div>
+      <div class="stepper" data-path="p.step" data-step="0.25" data-min="1" data-max="5"><label for="in-step">Feet per pin</label><div class="row"><button type="button" data-d="-1" aria-label="Down">−</button><input id="in-step" inputmode="decimal"><button type="button" data-d="1" aria-label="Up">+</button></div><small>Boards you move per pin column</small></div>
+    </div>
+    <div class="btnrow"><button class="btn quiet" id="su-reset" type="button">Reset to video defaults</button></div>
+  </div>
+  <div class="card">
+    <h3>Pin and board reference</h3>
+    <div class="lane" id="lane-ref"></div>
+    <p class="hint" id="ref-note">Boards count from your hand-side gutter. Arrows sit on boards 5, 10, 15, 20, 25, 30, 35. Pins: 1 is the head pin; the back row runs 7, 8, 9, 10 from left to right.</p>
+  </div>
+  <div class="card">
+    <h3>Sources</h3>
+    <p class="src"><a href="https://www.youtube.com/watch?v=eoEDaYzhH3Y" target="_blank" rel="noopener">Improve Your Targeting By Understanding The Math</a>, Bald Brothers Bowling<br>
+    <a href="https://www.youtube.com/watch?v=FXIeYKWzZmI" target="_blank" rel="noopener">How To Shoot Spares Like A Pro</a>, Darren Tang<br>
+    <a href="https://www.youtube.com/watch?v=kCIXAlB55RQ" target="_blank" rel="noopener">How To Shoot Spares In Bowling</a>, Luis Napoles</p>
+  </div>
+</section>
+</main>
+</div>
+
+<script>
+(function(){
+const DEF={hand:'R',drift:2,layoff:6,loft:0,sH:35,tH:21,sO:17,tO:20,step:2.5};
+let S={p:{...DEF},line:{bp:7,arrows:15,dist:45},mv:{feet:0,eyes:0},pins:[10],nights:[],tab:'line',
+  form:{kind:'strike',start:23,slide:25,arrows:15,result:''},openNight:null,confirmNight:null};
+const KEY='laneline.v2', OLD='laneline.v1';
+let persisted=false, saveOK=true;
+
+function todayStr(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function niceDate(ds){const [y,m,d]=ds.split('-').map(Number);const o={weekday:'short',month:'short',day:'numeric'};if(y!==new Date().getFullYear())o.year='numeric';return new Date(y,m-1,d).toLocaleDateString(undefined,o);}
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+
+/* ---------- storage ---------- */
+function applySaved(d){
+  if(d.p)S.p={...DEF,...d.p}; if(d.line)S.line={...S.line,...d.line}; if(d.mv)S.mv={...S.mv,...d.mv};
+  if(Array.isArray(d.pins))S.pins=d.pins; if(d.tab)S.tab=d.tab;
+  if(d.form)S.form={...S.form,...d.form,result:''};
+  if(Array.isArray(d.nights))S.nights=d.nights;
+}
+try{
+  const raw=localStorage.getItem(KEY);
+  if(raw)applySaved(JSON.parse(raw));
+  else{const old=localStorage.getItem(OLD);if(old){const d=JSON.parse(old);applySaved(d);
+    if(Array.isArray(d.log)&&d.log.length)S.nights=[{id:'n'+uid(),date:todayStr(),lanes:'',notes:'',shots:d.log}];}}
+}catch(e){}
+function snapshot(){return {p:S.p,line:S.line,mv:S.mv,pins:S.pins,tab:S.tab,
+  form:{kind:S.form.kind,start:S.form.start,slide:S.form.slide,arrows:S.form.arrows},nights:S.nights};}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(snapshot()));saveOK=true;}catch(e){saveOK=false;}}
+function askPersist(){try{if(navigator.storage&&navigator.storage.persist&&!persisted){navigator.storage.persist().then(ok=>{persisted=!!ok;renderStore();}).catch(()=>{});}}catch(e){}}
+try{if(navigator.storage&&navigator.storage.persisted)navigator.storage.persisted().then(ok=>{persisted=!!ok;renderStore();}).catch(()=>{});}catch(e){}
+
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const r2=x=>Math.round(x*2)/2;
+const f=x=>{if(x===null||x===undefined||isNaN(x))return '–';const v=r2(x);return Number.isInteger(v)?String(v):v.toFixed(1)};
+const sg=x=>(x>0?'+':'')+f(x);
+const L=()=>S.p.hand==='L';
+const dirIn=()=>L()?'right':'left', dirOut=()=>L()?'left':'right';
+
+/* ---------- math ---------- */
+const LO=()=>Math.min(Math.max(+S.p.loft||0,0),10);
+function lineFrom(arrows,bp,dist){const lay=arrows+(arrows-bp)*(15-LO())/(dist-15);const slide=lay+S.p.layoff;return {lay,slide,start:slide-S.p.drift,arrows,bp,dist};}
+function bpFrom(lay,arrows,dist){return arrows-(lay-arrows)*(dist-15)/(15-LO());}
+function cur(){return lineFrom(S.line.arrows,S.line.bp,S.line.dist);}
+function moved(){const c=cur();const lay=c.lay+S.mv.feet, arrows=c.arrows+S.mv.eyes;
+  return {lay,arrows,slide:c.slide+S.mv.feet,start:c.start+S.mv.feet,bp:bpFrom(lay,arrows,c.dist),dist:c.dist};}
+
+/* ---------- pins ---------- */
+const COL={10:0,6:1,3:2,9:2,1:3,5:3,2:4,8:4,4:5,7:6}, ROW={1:1,2:2,3:2,4:3,5:3,6:3,7:4,8:4,9:4,10:4};
+const MIR={1:1,2:3,3:2,4:6,6:4,5:5,7:10,10:7,8:9,9:8};
+const eq=n=>L()?MIR[n]:n; // real pin <-> hand-side-equivalent pin (map is its own inverse)
+const near=(a,b)=>{const dc=Math.abs(COL[a]-COL[b]),dr=Math.abs(ROW[a]-ROW[b]);return (dr===0&&dc===2)||(dr===1&&dc===1)||dc===0;};
+function groups(set){const left=[...set],out=[];while(left.length){const g=[left.shift()];for(let i=0;i<g.length;i++){for(let j=left.length-1;j>=0;j--){if(near(g[i],left[j]))g.push(left.splice(j,1)[0]);}}out.push(g);}return out;}
+const pinBoard=c=>20-(3-c)*5.64;
+const mean=a=>a.reduce((s,x)=>s+x,0)/a.length;
+
+function standFor(ec){const p=S.p;return ec<=3?{stand:p.sH-p.step*ec,look:p.tH}:{stand:p.sO+p.step*(6-ec),look:p.tO};}
+function sideWord(towardHand){return towardHand?(L()?'left':'right'):(L()?'right':'left');}
+function stance(ec){
+  if(ec>=3.5)return 'Closed stance: turn your feet and hips toward the pin, then walk straight at it. Keep the swing from getting behind you. Expect more drift than on the '+eq(10)+' pin.';
+  if(ec<=2.5)return 'Stand outside and walk toward the pin. Flat wrist, more speed, straight roll.';
+  return 'Square up and roll it straight through your target.';
+}
+function hitFor(pins){ // pins: equivalent numbers
+  const minRow=Math.min(...pins.map(n=>ROW[n]));const front=pins.filter(n=>ROW[n]===minRow);
+  const mc=mean(pins.map(n=>COL[n]));
+  if(pins.length===1)return {ec:COL[pins[0]],hit:'Center of the '+eq(pins[0])};
+  if(front.length>1){return {ec:mean(front.map(n=>COL[n])),hit:'Between the '+front.map(eq).sort((a,b)=>a-b).join(' and ')};}
+  const k=front[0],kc=COL[k];const ec=(kc+mc)/2;
+  const hit=Math.abs(mc-kc)<0.01?'Center of the '+eq(k):(sideWord(mc<kc)+' side of the '+eq(k));
+  return {ec,hit:hit.charAt(0).toUpperCase()+hit.slice(1)};
+}
+function analyze(real){
+  if(!real.length)return null;
+  const P=real.map(eq).sort((a,b)=>a-b), key=P.join('-');
+  const name=real.slice().sort((a,b)=>a-b).join('-');
+  const c=cur(); let o;
+  if(key==='1-2-4-10'||key==='1-2-10'){const s=standFor(4);o={type:'Washout',ec:3.3,stand:s.stand+0.5,look:S.p.tO,hit:'Head pin flush, just '+sideWord(true)+' of center',
+    notes:['Half a board '+sideWord(false)+' of your '+eq(2)+' pin spot, so the head pin drives off the wall into the '+eq(10)+'.','Throw it straight. A half board miss either way can leave the '+eq(10)+'.']};}
+  else if(key==='1-2-4-6-10'){o={type:'Washout',ec:2.6,stand:S.p.sH,look:S.p.tH+4,hit:sideWord(true).replace(/^./,m=>m.toUpperCase())+' side of the head pin',
+    notes:['Shoot it across from your '+eq(10)+' pin spot, looking 4 boards farther in.','Miss '+sideWord(false)+' and the head pin still flushes into the '+eq(6)+'-'+eq(10)+'.']};}
+  else if(key==='3-6-9-10'){o={type:'Spare',ec:1.6,stand:S.p.sH+1,look:S.p.tH+4,hit:'The '+eq(3)+' pin heavy',
+    notes:['One board '+sideWord(false)+' of the super washout spot.','Hard and straight. Worst case you still get 3 or more for count.']};}
+  else if(key==='2-8'||key==='2-4-8'||key==='2-5-8'){o={type:'Hook it',ec:4,hook:true,stand:c.start-5,look:c.arrows,hit:'Pocket of the '+eq(2),
+    notes:['Use your strike ball and your strike target; move your feet about 5 boards toward the '+eq(10)+' side. Fewer boards on a fresh, hooking front end.','The ball needs angle to take the '+eq(2)+' into the '+eq(8)+'. A straight ball has to hit it dead flush.']};}
+  if(o){return {name,...o,stanceNote:o.hook?'Use your normal strike setup and release. Commit to the shot.':stance(o.ec)};}
+  const g=groups(P);
+  if(g.length===1){const h=hitFor(P);const s=standFor(h.ec);
+    return {name,type:P.length===1?'Single pin':'Spare',ec:h.ec,stand:s.stand,look:s.look,hit:h.hit,stanceNote:stance(h.ec),
+      notes:P.length===1?['You have about a ball width either side of the pin. Same spot, same target.']:['Think slide spot and target, not pin count.']};}
+  const baby=P.length===2&&Math.abs(COL[P[0]]-COL[P[1]])===2&&Math.abs(ROW[P[0]]-ROW[P[1]])===2;
+  if(baby){const h=hitFor(P);const s=standFor(h.ec);
+    return {name,type:'Baby split',ec:h.ec,stand:s.stand,look:s.look,hit:h.hit,stanceNote:stance(h.ec),notes:['Makeable. Hit the front pin on the gap side so it slides into the back pin.']};}
+  g.sort((a,b)=>b.length-a.length||Math.min(...a.map(n=>COL[n]))-Math.min(...b.map(n=>COL[n])));
+  const pick=g[0];const h=hitFor(pick);const s=standFor(h.ec);
+  return {name,type:'Split',ec:h.ec,stand:s.stand,look:s.look,hit:'Take the '+pick.map(eq).sort((a,b)=>a-b).join('-')+': '+h.hit.charAt(0).toLowerCase()+h.hit.slice(1),stanceNote:stance(h.ec),
+    notes:['Go for count. Convert only if the match is on the line.','Count adds up: 10 to 30 pins or more over a block.']};
+}
+
+/* ---------- lane drawing ---------- */
+const W=7.6,GX=12,TOP=84,PF=5.6; // px per board, gutter width, y of the 60 ft line, px per foot
+const LANEW=39*W, SVGW=LANEW+GX*2, FOUL=TOP+60*PF, SVGH=FOUL+15*PF+34;
+const X=b=>L()?GX+(b-0.5)*W:GX+(39-b+0.5)*W;
+const Y=ft=>TOP+(60-ft)*PF;
+const PINY=r=>TOP-8-(r-1)*17;
+const PINX=n=>GX+(39-pinBoard(COL[n])+0.5)*W; // real lane position; the 10 pin is always on the right
+const BOARD_LABELS=[1,5,10,15,20,25,30,35,39];
+function boardRow(y,bg){let s='';BOARD_LABELS.forEach(b=>{const x=Math.max(GX+8,Math.min(GX+LANEW-8,X(b)));
+  s+=`<rect x="${x-7}" y="${y-8}" width="14" height="11" rx="2" fill="${bg}"/><text x="${x}" y="${y+1}" text-anchor="middle" font-size="8.5" font-weight="700" font-family="var(--f-mono)" fill="var(--mark)">${b}</text>`;});return s;}
+function laneSVG(o){
+  let s=`<svg viewBox="0 0 ${SVGW.toFixed(1)} ${SVGH.toFixed(1)}" role="img" aria-label="${o.label||'Lane diagram'}" xmlns="http://www.w3.org/2000/svg">`;
+  s+=`<rect x="0" y="0" width="${SVGW}" height="${SVGH}" rx="8" fill="var(--gutter)"/>`;
+  s+=`<rect x="${GX}" y="4" width="${LANEW}" height="${SVGH-8}" fill="var(--maple)"/>`;
+  for(let b=1;b<39;b++){const x=GX+b*W;s+=`<line x1="${x}" y1="4" x2="${x}" y2="${SVGH-4}" stroke="var(--maple-line)" stroke-width="${b%5===0?0.9:0.4}"/>`;}
+  s+=`<line x1="${GX}" y1="${FOUL}" x2="${GX+LANEW}" y2="${FOUL}" stroke="var(--mark)" stroke-width="2"/>`;
+  for(let b=5;b<=35;b+=5){const ft=16-Math.abs(b-20)/5*1.33,x=X(b),y=Y(ft),k=b===20?1.45:1;s+=`<path d="M${x} ${y-7*k} L${x+3.4*k} ${y+3*k} L${x-3.4*k} ${y+3*k} Z" fill="var(--mark)"/>`;}
+  // one row of approach dots, 15 ft behind the foul line; the board 20 dot is larger
+  [5,10,15,20,25,30,35].forEach(b=>{s+=`<circle cx="${X(b)}" cy="${Y(-15)}" r="${b===20?3.8:2.4}" fill="var(--mark)"/>`;});
+  s+=`<text x="${GX+4}" y="${Y(-15)+3}" font-size="7.5" font-family="var(--f-mono)" fill="var(--mark)" opacity=".8">15 FT</text>`;
+  [10,15].forEach(b=>{const x=X(b),y=Y(45);s+=`<line x1="${x}" y1="${y-4}" x2="${x}" y2="${y+4}" stroke="var(--mark)" stroke-width="1.6"/>`;});
+  // board numbers: under the arrows, at the break point zone, and at the foul line
+  s+=boardRow(Y(9.5),'var(--maple)');
+  s+=boardRow(Y(40),'var(--maple)');
+  s+=boardRow(FOUL+25,'var(--maple)');
+  s+=`<text x="${GX+LANEW/2}" y="${SVGH-8}" text-anchor="middle" font-size="8.5" font-family="var(--f-mono)" fill="var(--mark)">APPROACH · board 1 = ${L()?'left':'right'} gutter</text>`;
+  // pins with numbers
+  const stand=o.standing||new Set([1,2,3,4,5,6,7,8,9,10]);
+  for(let n=1;n<=10;n++){const r=ROW[n],x=PINX(n),y=PINY(r),up=stand.has(n);
+    s+=`<circle cx="${x}" cy="${y}" r="7.5" fill="${up?'var(--pin)':'var(--maple)'}" stroke="${up?'var(--pin-stroke)':'var(--mark)'}" stroke-width="${up?1.3:0.9}" stroke-dasharray="${up?'':'2 2'}"/>`;
+    s+=`<text x="${x}" y="${y+3.2}" text-anchor="middle" font-size="9" font-weight="700" font-family="var(--f-mono)" fill="${up?'var(--pin-text)':'var(--mark)'}" opacity="${up?1:.6}">${n}</text>`;}
+  (o.paths||[]).forEach(p=>{s+=`<path d="${p.d}" fill="none" stroke="${p.old?'var(--ball-2)':'var(--ball)'}" stroke-width="${p.old?2:3}" stroke-dasharray="${p.old?'5 4':''}" stroke-linecap="round"/>`;});
+  (o.dots||[]).forEach(p=>{s+=`<circle cx="${X(p.b)}" cy="${Y(p.ft)}" r="${p.r||3.6}" fill="${p.c||'var(--ball)'}" stroke="var(--maple)" stroke-width="1.2"/>`;
+    if(p.label){const x=X(p.b),w=p.label.length*6.1+6;let left=x<SVGW/2;if(left?x-9-w<GX:x+9+w>GX+LANEW)left=!left;const tx=left?x-9:x+9,rx=left?tx-w+3:tx-3,yy=Y(p.ft)+(p.dy||0);
+      s+=`<rect x="${rx}" y="${yy-7}" width="${w}" height="14" rx="3" fill="var(--maple)" opacity=".95"/><text x="${tx}" y="${yy+3.5}" text-anchor="${left?'end':'start'}" font-size="10" font-weight="700" font-family="var(--f-mono)" fill="var(--mark)">${p.label}</text>`;}});
+  (o.feet||[]).forEach(p=>{const x=X(p.b),y=Y(p.ft);s+=`<rect x="${x-4}" y="${y-7}" width="8" height="14" rx="4" fill="${p.c||'var(--accent)'}"/>`;
+    const left=x>SVGW/2,w=p.label.length*6.1+6,tx=left?x-8:x+8,rx=left?tx-w+3:tx-3;
+    s+=`<rect x="${rx}" y="${y-6}" width="${w}" height="14" rx="3" fill="var(--maple)" opacity=".95"/><text x="${tx}" y="${y+4}" text-anchor="${left?'end':'start'}" font-size="10" font-weight="700" font-family="var(--f-mono)" fill="var(--mark)">${p.label}</text>`;});
+  return s+'</svg>';
+}
+const clampB=b=>Math.max(0.5,Math.min(39.5,b));
+function strikePath(l){const pocket=17.5;
+  return `M${X(clampB(l.lay))} ${Y(LO())} L${X(clampB(l.arrows))} ${Y(15)} L${X(clampB(l.bp))} ${Y(l.dist)} Q${X(clampB(l.bp))} ${Y(l.dist+(60-l.dist)*0.7)} ${X(pocket)} ${Y(60)-2}`;}
+
+/* ---------- steppers ---------- */
+const getP=p=>p.split('.').reduce((o,k)=>o[k],S);
+function setP(p,v){const ks=p.split('.');const last=ks.pop();ks.reduce((o,k)=>o[k],S)[last]=v;}
+function clampFor(el,v){const mn=+el.dataset.min,mx=+el.dataset.max;return Math.max(mn,Math.min(mx,v));}
+document.addEventListener('click',e=>{const b=e.target.closest('.stepper button');if(!b)return;
+  const st=b.closest('.stepper');const step=+st.dataset.step;const v=+getP(st.dataset.path)+(+b.dataset.d)*step;
+  setP(st.dataset.path,clampFor(st,Math.round(v*100)/100));onChange();});
+document.addEventListener('change',e=>{const st=e.target.closest('.stepper');if(!st||e.target.tagName!=='INPUT')return;
+  const v=parseFloat(e.target.value);if(!isNaN(v))setP(st.dataset.path,clampFor(st,v));onChange();});
+
+/* ---------- tabs ---------- */
+document.querySelector('.tabs').addEventListener('click',e=>{const t=e.target.closest('.tab');if(!t)return;S.tab=t.dataset.tab;if(S.tab==='log')prefill();render();save();});
+
+/* ---------- moves ---------- */
+const PRESETS=[[3,2],[2,1],[2,0],[1,1],[-2,-1],[-3,-2]];
+$('#mv-presets').addEventListener('click',e=>{const b=e.target.closest('.chip');if(!b)return;S.mv.feet=+b.dataset.f;S.mv.eyes=+b.dataset.e;onChange();});
+$('#m-apply').addEventListener('click',()=>{const m=moved();S.line.arrows=Math.round(m.arrows*100)/100;S.line.bp=Math.round(m.bp*100)/100;S.mv={feet:0,eyes:0};onChange();});
+$('#m-reset').addEventListener('click',()=>{S.mv={feet:0,eyes:0};onChange();});
+
+/* ---------- spares ---------- */
+$('#deck').addEventListener('click',e=>{const b=e.target.closest('.pinb');if(!b)return;const n=+b.dataset.pin;
+  S.pins=S.pins.includes(n)?S.pins.filter(x=>x!==n):[...S.pins,n];onChange();});
+const QUICK=[[10],[7],[6,10],[3,6,10],[4,7],[9],[2],[1,2,4,10],[1,2,4,6,10],[3,6,9,10],[2,8],[6,7,10],[7,10]];
+$('#sp-quick').addEventListener('click',e=>{const b=e.target.closest('.chip');if(!b)return;S.pins=b.dataset.pins.split('-').map(Number);onChange();});
+
+/* ---------- setup ---------- */
+$('#v-setup').addEventListener('click',e=>{const b=e.target.closest('[data-hand]');if(b){S.p.hand=b.dataset.hand;onChange();}});
+$('#su-reset').addEventListener('click',()=>{const h=S.p.hand;S.p={...DEF,hand:h};onChange();});
+
+/* ---------- nights and shots ---------- */
+const RES={strike:['Strike','10 pin','4 pin','7 pin','Split','Light','High','Other'],spare:['Made','Missed']};
+function tonight(create){let n=S.nights.find(x=>x.date===todayStr());
+  if(!n&&create){n={id:'n'+uid(),date:todayStr(),lanes:'',notes:'',shots:[]};S.nights.push(n);}return n;}
+function statsFor(shots){const fb=shots.filter(l=>l.kind==='strike'),spr=shots.filter(l=>l.kind==='spare');
+  const dr=shots.filter(l=>isFinite(l.slide)&&isFinite(l.start));
+  return {n:shots.length,drift:dr.length?mean(dr.map(l=>l.slide-l.start)):null,
+    x:fb.length?Math.round(100*fb.filter(l=>l.result==='Strike').length/fb.length):null,
+    sp:spr.length?Math.round(100*spr.filter(l=>l.result==='Made').length/spr.length):null};}
+const pct=v=>v===null?'–':v+'%';
+function prefill(){const c=cur();
+  if(S.form.kind==='strike'){S.form.start=r2(c.start);S.form.slide=r2(c.slide);S.form.arrows=r2(c.arrows);}
+  else{const a=analyze(S.pins);if(a){S.form.start=r2(a.stand);S.form.slide=r2(a.stand+S.p.drift);S.form.arrows=r2(a.look);}}}
+$('#v-log').addEventListener('click',e=>{
+  const k=e.target.closest('[data-kind]');if(k){S.form.kind=k.dataset.kind;S.form.result='';prefill();onChange();return;}
+  const r=e.target.closest('#lg-results .chip');if(r){S.form.result=r.dataset.r;render();return;}
+  const x=e.target.closest('#lg-list .x');if(x){const t=tonight(false);if(t)t.shots=t.shots.filter(l=>l.id!==x.dataset.id);onChange();return;}
+  const dn=e.target.closest('[data-delnight]');if(dn){S.confirmNight=dn.dataset.delnight;render();return;}
+  const yes=e.target.closest('[data-delyes]');if(yes){S.nights=S.nights.filter(n=>n.id!==yes.dataset.delyes);S.confirmNight=null;onChange();return;}
+  const no=e.target.closest('[data-delno]');if(no){S.confirmNight=null;render();return;}
+});
+$('#hist').addEventListener('toggle',e=>{const d=e.target;if(d.tagName!=='DETAILS')return;
+  if(d.open)S.openNight=d.dataset.id;else if(S.openNight===d.dataset.id)S.openNight=null;},true);
+$('#in-lanes').addEventListener('input',e=>{tonight(true).lanes=e.target.value;save();});
+$('#in-notes').addEventListener('input',e=>{tonight(true).notes=e.target.value;save();});
+$('#lg-prefill').addEventListener('click',()=>{prefill();render();});
+$('#lg-save').addEventListener('click',()=>{
+  if(!S.form.result){$('#lg-msg').textContent='Pick a result first.';return;}
+  const fm=S.form;const leave=fm.kind==='spare'?S.pins.slice().sort((a,b)=>a-b).join('-'):'';
+  const t=tonight(true);
+  t.shots.push({id:uid(),kind:fm.kind,start:fm.start,slide:fm.slide,arrows:fm.arrows,result:fm.result,leave,planned:fm.start+S.p.drift,
+    line:{bp:r2(S.line.bp),arrows:r2(S.line.arrows)}});
+  S.form.result='';onChange();askPersist();
+  $('#lg-msg').textContent=saveOK?'Saved shot '+t.shots.length+' for tonight.':'Shot added, but this browser is not letting Lane Line save.';});
+$('#st-usedrift').addEventListener('click',()=>{const t=tonight(false);const d=t?statsFor(t.shots).drift:null;if(d!==null){S.p.drift=r2(d);onChange();$('#lg-msg').textContent='Drift set to '+sg(S.p.drift)+'.';}});
+$('#lg-clear').addEventListener('click',()=>{$('#lg-confirm').hidden=false;});
+$('#lg-no').addEventListener('click',()=>{$('#lg-confirm').hidden=true;});
+$('#lg-yes').addEventListener('click',()=>{const t=tonight(false);if(t)t.shots=[];$('#lg-confirm').hidden=true;onChange();});
+function shotLine(l,i){return `#${i+1} ${l.kind==='strike'?'First ball':'Spare '+l.leave}: start ${f(l.start)}, slide ${f(l.slide)}, arrows ${f(l.arrows)}, ${l.result}`;}
+function nightText(n){const s=statsFor(n.shots);return [niceDate(n.date)+(n.lanes?' · lanes '+n.lanes:''),n.notes||'',
+  `Shots ${s.n} · strike ${pct(s.x)} · spare ${pct(s.sp)} · drift ${s.drift===null?'–':sg(s.drift)}`,...n.shots.map(shotLine)].filter(Boolean).join('\n');}
+function copyText(t,okMsg,msgEl){const box=$('#lg-copybox');
+  const fallback=()=>{box.hidden=false;box.value=t;box.focus();box.select();msgEl.textContent='Select all and copy from the box below.';};
+  try{navigator.clipboard.writeText(t).then(()=>{msgEl.textContent=okMsg;},fallback);}catch(e){fallback();}}
+$('#lg-copy').addEventListener('click',()=>{const t=tonight(false);copyText(t&&t.shots.length?nightText(t):'No shots yet tonight.','Tonight copied.',$('#lg-msg'));});
+
+/* ---------- backup ---------- */
+function backupJSON(){return JSON.stringify({app:'lane-line',version:2,exported:new Date().toISOString(),...snapshot()});}
+$('#bk-export').addEventListener('click',()=>{
+  try{const blob=new Blob([backupJSON()],{type:'application/json'});const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download='lane-line-backup-'+todayStr()+'.json';document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),4000);
+    $('#store-msg').textContent='Backup file created. If nothing downloaded, use Copy backup and paste it into a note.';}
+  catch(e){$('#store-msg').textContent='This browser blocked the download. Use Copy backup instead.';}});
+$('#bk-copy').addEventListener('click',()=>copyText(backupJSON(),'Backup copied. Paste it into a note or email to yourself.',$('#store-msg')));
+$('#bk-file').addEventListener('change',e=>{const file=e.target.files&&e.target.files[0];if(!file)return;
+  const rd=new FileReader();rd.onload=()=>{try{const d=JSON.parse(rd.result);
+      if(!d||d.app!=='lane-line'||!Array.isArray(d.nights))throw new Error('not a backup');
+      let added=0;d.nights.forEach(n=>{const ex=S.nights.find(x=>x.id===n.id);
+        if(!ex){S.nights.push(n);added++;}else if((n.shots||[]).length>(ex.shots||[]).length){Object.assign(ex,n);}});
+      if(d.p)S.p={...DEF,...d.p};if(d.line)S.line={...S.line,...d.line};
+      onChange();$('#store-msg').textContent='Restored your numbers and '+added+' night'+(added===1?'':'s')+'.';}
+    catch(err){$('#store-msg').textContent='That file is not a Lane Line backup. Pick the file named lane-line-backup.';}
+    e.target.value='';};rd.readAsText(file);});
+function renderStore(){const el=$('#store-msg');if(!el)return;
+  el.textContent=!saveOK?'This browser is blocking storage, so shots will not be kept. Open Lane Line from your home screen or a normal browser tab.'
+    :persisted?'Saved on this phone and protected from automatic cleanup. Save a backup file now and then.'
+    :'Saved on this phone as you go. Save a backup file now and then.';}
+
+/* ---------- render ---------- */
+function setIn(id,v){const el=document.getElementById(id);if(el&&document.activeElement!==el)el.value=f(v);}
+function setTxtIn(id,v){const el=document.getElementById(id);if(el&&document.activeElement!==el)el.value=v||'';}
+function txt(id,v){const el=document.getElementById(id);if(el)el.textContent=v;}
+function render(){
+  const p=S.p;
+  txt('tag',(L()?'Lefty':'Righty')+' · drift '+sg(p.drift)+' · layoff '+f(p.layoff)+(LO()>0?' · loft '+f(LO())+' ft':''));
+  document.querySelectorAll('.tab').forEach(t=>t.setAttribute('aria-selected',String(t.dataset.tab===S.tab)));
+  ['line','moves','spares','body','log','setup'].forEach(v=>{document.getElementById('v-'+v).hidden=v!==S.tab;});
+
+  // line
+  const c=cur();
+  setIn('in-bp',S.line.bp);setIn('in-layoff2',p.layoff);setIn('in-loft2',p.loft);setIn('in-ar',S.line.arrows);setIn('in-dist',S.line.dist);
+  txt('o-start',f(c.start));txt('o-look',f(c.arrows));
+  txt('p-start',f(c.start));txt('p-slide',f(c.slide));txt('p-lay',f(c.lay));txt('p-ar',f(c.arrows));txt('p-bp',f(c.bp));
+  $('#o-check').innerHTML='The ball should touch down on board <b>'+f(c.lay)+'</b>'+(LO()>0?', about <b>'+f(LO())+' ft</b> past the foul line,':' at the foul line,')+' '+f(p.layoff)+' boards from your slide toe. After the shot, look down: you should be sliding on <b>'+f(c.slide)+'</b>. If you are not, fix your feet before you change your target.';
+  txt('lg-board1','Board 1 is the '+(L()?'left':'right')+' gutter');
+  $('#lane-line').innerHTML=laneSVG({label:'Strike line',paths:[{d:strikePath(c)}],
+    dots:[{b:c.lay,ft:LO(),dy:-12,label:'Lay down '+f(c.lay),c:'var(--accent)'},{b:c.arrows,ft:15,dy:-16,label:'Arrows '+f(c.arrows)},{b:c.bp,ft:c.dist,label:'BP '+f(c.bp)}],
+    feet:[{b:c.start,ft:-12,label:'Start '+f(c.start)},{b:c.slide,ft:-2.2,label:'Slide '+f(c.slide),c:'var(--ink)'}]});
+
+  // moves
+  const m=moved();
+  txt('mv-cur','Current line: stand '+f(c.start)+', look '+f(c.arrows)+', break point '+f(c.bp)+'.');
+  txt('lbl-feet','Feet (+ = '+dirIn()+')');txt('lbl-eyes','Eyes (+ = '+dirIn()+')');
+  setIn('in-feet',S.mv.feet);setIn('in-eyes',S.mv.eyes);
+  $('#mv-presets').innerHTML=PRESETS.map(([fe,ey])=>`<button type="button" class="chip" data-f="${fe}" data-e="${ey}" aria-pressed="${S.mv.feet===fe&&S.mv.eyes===ey}">${Math.abs(fe)} &amp; ${Math.abs(ey)} ${fe>0?dirIn():dirOut()}</button>`).join('');
+  txt('m-start',f(m.start));txt('m-look',f(m.arrows));
+  txt('mp-start',f(m.start));txt('mp-slide',f(m.slide));txt('mp-lay',f(m.lay));txt('mp-ar',f(m.arrows));txt('mp-bp',f(m.bp));
+  const d=m.bp-c.bp;let v;
+  if(!S.mv.feet&&!S.mv.eyes)v='No move yet. Pick a preset or set your feet and eyes.';
+  else if(Math.abs(d)<0.25)v='Break point stays on '+f(m.bp)+'. You change the angle and the oil you play, not where the ball turns.';
+  else if(d<0)v='Break point opens '+f(-d)+' board'+(Math.abs(r2(d))===1?'':'s')+' toward the gutter, to '+f(m.bp)+'. More room and more angle into the pocket.';
+  else v='Break point tightens '+f(d)+' board'+(Math.abs(r2(d))===1?'':'s')+' toward the middle, to '+f(m.bp)+'. Less room; the ball turns earlier toward the pocket.';
+  txt('m-verdict',v);
+  $('#mv-why').innerHTML='<b>Ball too strong or high</b> (through the nose, high splits): move '+dirIn()+', usually a 2 and 1. <b>Ball weak or light</b> (fading, not finishing): move '+dirOut()+', usually a 2 and 1. General guidance; your leaves tell you which.';
+  $('#lane-moves').innerHTML=laneSVG({label:'Line before and after the move',paths:[{d:strikePath(c),old:true},{d:strikePath(m)}],
+    dots:[{b:m.lay,ft:LO(),dy:-12,label:'Lay down '+f(m.lay),c:'var(--accent)'},{b:m.arrows,ft:15,dy:-16,label:'Arrows '+f(m.arrows)},{b:m.bp,ft:m.dist,label:'BP '+f(m.bp)}],
+    feet:[{b:m.start,ft:-12,label:'Start '+f(m.start)}]});
+
+  // spares
+  const rows=[[7,8,9,10],[4,5,6],[2,3],[1]];
+  $('#deck').innerHTML=rows.map(r=>'<div class="r">'+r.map(n=>`<button type="button" class="pinb" data-pin="${n}" aria-pressed="${S.pins.includes(n)}" aria-label="Pin ${n}">${n}</button>`).join('')+'</div>').join('');
+  const key=S.pins.slice().sort((a,b)=>a-b).join('-');
+  $('#sp-quick').innerHTML=QUICK.map(q=>{const real=q.map(eq).sort((a,b)=>a-b).join('-');return `<button type="button" class="chip" data-pins="${real}" aria-pressed="${real===key}">${real}</button>`;}).join('');
+  const a=analyze(S.pins);
+  if(!a){$('#sp-result').innerHTML='<p class="empty">Tap the pins that are still standing to get your spot and target.</p>';}
+  else{const cls=a.type==='Split'?'split':a.type==='Hook it'?'hook':'';
+    $('#sp-result').innerHTML=`<div class="leave-head"><span class="leave-name">${a.name}</span><span class="pill ${cls}">${a.type}</span></div>
+      <div class="callout"><div class="big hot"><span>Stand on</span><b class="num">${f(a.stand)}</b></div><div class="big"><span>Look at</span><b class="num">${f(a.look)}</b></div></div>
+      <p><b>Hit:</b> ${a.hit}</p><p class="hint">${a.stanceNote}</p>
+      <ul class="notes">${a.notes.map(n=>'<li>'+n+'</li>').join('')}</ul>`;}
+  const st=new Set(S.pins);let sp={label:'Spare line',standing:st};
+  if(a){const pb=pinBoard(a.ec);const lay=a.look-(pb-a.look)*(15-LO())/45;
+    if(a.type==='Hook it'){const hb=bpFrom(c.lay-5,c.arrows,c.dist);sp.paths=[{d:`M${X(clampB(c.lay-5))} ${Y(LO())} L${X(clampB(c.arrows))} ${Y(15)} L${X(clampB(hb))} ${Y(c.dist)} Q${X(clampB(hb))} ${Y(55)} ${X(pinBoard(4)-1)} ${Y(60)}`}];}
+    else sp.paths=[{d:`M${X(clampB(lay))} ${Y(LO())} L${X(a.look)} ${Y(15)} L${X(pb)} ${Y(60)}`}];
+    sp.dots=[{b:a.type==='Hook it'?c.lay-5:lay,ft:LO(),dy:-12,label:'Lay down '+f(a.type==='Hook it'?c.lay-5:lay),c:'var(--accent)'},{b:a.look,ft:15,dy:-16,label:'Look '+f(a.look)}];sp.feet=[{b:a.stand,ft:-12,label:'Stand '+f(a.stand)}];}
+  $('#lane-spare').innerHTML=laneSVG(sp);
+
+  // body
+  const nearPins=L()?'7, 4, 4-7':'10, 6, 3-6-10, 9', farPins=L()?'10, 6, 6-10':'7, 4, 4-7';
+  txt('h-near',(L()?'Left':'Right')+'-side spares ('+nearPins+')');txt('h-far',(L()?'Right':'Left')+'-side spares ('+farPins+')');
+  renderChecks('ck-strike',['Feet on your start board, measured from the center of your slide toe','Eyes on your arrow board; picture the line out to the break point','Shoulders square to that line, not to the pins','Swing straight along the line, loose grip, loose arm','Hold your finish and look down: did you slide where you planned?']);
+  renderChecks('ck-near',['Stand outside, open slightly toward the pin','Flat wrist, more speed, straight roll','Walk toward the pin; 4 to 6 boards of drift is normal']);
+  renderChecks('ck-far',['Closed stance: feet and hips turned toward the pin','Pretend the lane runs straight at the pin and walk that line','Keep the swing from getting behind you so you never cross your body','Expect more drift than on the '+eq(10)+' pin, about 8 to 10 boards']);
+
+  // log: tonight
+  document.querySelectorAll('#v-log [data-kind]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.kind===S.form.kind)));
+  setIn('in-lstart',S.form.start);setIn('in-lslide',S.form.slide);setIn('in-lar',S.form.arrows);
+  $('#lg-results').innerHTML=RES[S.form.kind].map(r=>`<button type="button" class="chip" data-r="${r}" aria-pressed="${S.form.result===r}">${r}</button>`).join('');
+  const t=tonight(false), shots=t?t.shots:[], ts=statsFor(shots);
+  txt('tn-date',niceDate(todayStr()));
+  setTxtIn('in-lanes',t?t.lanes:'');setTxtIn('in-notes',t?t.notes:'');
+  txt('st-n',ts.n);txt('st-drift',ts.drift===null?'–':sg(ts.drift));txt('st-x',pct(ts.x));txt('st-sp',pct(ts.sp));
+  const ub=$('#st-usedrift');ub.hidden=!(ts.drift!==null&&ts.n>=3&&r2(ts.drift)!==r2(p.drift));ub.textContent='Use '+(ts.drift===null?'':sg(ts.drift))+' as my drift';
+  $('#lg-list').innerHTML=shots.length?shotRows(shots,true)
+    :'<p class="empty">No shots yet tonight. Log your first ball after you throw it; your drift fills in after a few shots.</p>';
+
+  // log: history
+  const all=S.nights.flatMap(n=>n.shots||[]), as=statsFor(all), withShots=S.nights.filter(n=>(n.shots||[]).length);
+  txt('at-nights',withShots.length);txt('at-drift',as.drift===null?'–':sg(as.drift));txt('at-x',pct(as.x));txt('at-sp',pct(as.sp));
+  const past=S.nights.filter(n=>(n.shots||[]).length||n.notes||n.lanes).slice().sort((a,b)=>b.date.localeCompare(a.date));
+  $('#hist').innerHTML=past.length?past.map(n=>{const s=statsFor(n.shots||[]);const isT=n.date===todayStr();
+    return `<details class="night" data-id="${n.id}" ${S.openNight===n.id?'open':''}><summary><span class="nd">${niceDate(n.date)}${isT?' (tonight)':''}${n.lanes?' · lanes '+esc(n.lanes):''}</span>
+      <span class="ns">${s.n} shot${s.n===1?'':'s'} · strike ${pct(s.x)} · spare ${pct(s.sp)} · drift ${s.drift===null?'–':sg(s.drift)}</span></summary>
+      <div class="nbody">${n.notes?`<p class="nmeta">${esc(n.notes)}</p>`:''}<div class="loglist">${shotRows(n.shots||[],false)}</div>
+      ${S.confirmNight===n.id?`<div class="confirm"><span>Delete this night and its shots?</span><button type="button" class="btn" data-delyes="${n.id}">Delete</button><button type="button" class="btn quiet" data-delno="1">Keep</button></div>`
+        :`<div class="btnrow"><button type="button" class="btn quiet" data-delnight="${n.id}">Delete this night</button></div>`}</div></details>`;}).join('')
+    :'<p class="empty">Your league nights show up here after you log shots. Each night keeps its shots, lanes, notes, strike and spare percentages, and drift.</p>';
+  renderStore();
+
+  // setup
+  document.querySelectorAll('#v-setup [data-hand]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.hand===p.hand)));
+  setIn('in-drift',p.drift);setIn('in-layoff',p.layoff);setIn('in-loft',p.loft);setIn('in-sH',p.sH);setIn('in-tH',p.tH);setIn('in-sO',p.sO);setIn('in-tO',p.tO);setIn('in-step',p.step);
+  const hc=eq(10),oc=eq(7);
+  txt('lbl-sH',hc+' pin: stand');txt('lbl-tH',hc+' pin: look');txt('lbl-sO',oc+' pin: stand');txt('lbl-tO',oc+' pin: look');
+  txt('sm-drift','Slide minus start. + means you drift '+dirIn()+', toward the middle.');
+  if(S.tab==='setup')$('#lane-ref').innerHTML=laneSVG({label:'Board and pin reference'});
+  txt('ref-note','Board 1 is the '+(L()?'left':'right')+' gutter; board 20 is the middle. Arrows sit on boards 5, 10, 15, 20, 25, 30, 35, and the second tracers at 45 feet sit on 10 and 15. The approach dots shown are the row 15 feet back, five boards apart. The larger dot and the larger arrow both mark board 20, the middle of the lane. Pins: 1 is the head pin; the back row runs 7, 8, 9, 10 from left to right.');
+}
+function shotRows(shots,canDelete){return shots.map((l,i)=>({l,i})).reverse().map(({l,i})=>{const ok=l.result==='Strike'||l.result==='Made',miss=l.result==='Missed';
+  const off=isFinite(l.planned)?l.slide-l.planned:0;
+  return `<div class="logrow"><span class="n">#${i+1}</span><span>${l.kind==='strike'?'First ball':'Spare '+esc(l.leave||'')} · start ${f(l.start)} · slide ${f(l.slide)}${Math.abs(off)>=1?' ('+sg(off)+')':''} · arrows ${f(l.arrows)}<br><span class="res ${ok?'ok':miss?'miss':''}">${esc(l.result)}</span></span>${canDelete?`<button type="button" class="x" data-id="${l.id}" aria-label="Delete shot ${i+1}">×</button>`:'<span></span>'}</div>`;}).join('');}
+function renderChecks(id,items){const el=document.getElementById(id);const prev=[...el.querySelectorAll('input')].map(i=>i.checked);
+  el.innerHTML=items.map((t,i)=>`<label><input type="checkbox" id="${id}-${i}" ${prev[i]?'checked':''}><span>${t}</span></label>`).join('');}
+function onChange(){save();render();}
+window.addEventListener('pageshow',()=>render());
+render();
+})();
+</script>
+<!--PWA-->
+<script>
+if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost')){
+  window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{});});
+}
+</script>
+<!--/PWA-->
+</body>
+</html>
