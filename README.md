@@ -19,33 +19,12 @@ Your numbers and logs save on your phone, in the browser's local storage, every 
 - The app asks the browser to protect its storage from automatic cleanup. The Log tab tells you whether that worked.
 - Use **Log > Backup > Save backup file** now and then. **Restore backup** brings it back on a new phone, and it merges nights without duplicating them.
 
-## Put it on GitHub Pages
-
-1. Create a new repository on GitHub, for example `lane-line`. GitHub Pages on a free account needs a public repo.
-2. Push this folder:
-
-   ```sh
-   git remote add origin https://github.com/<your-username>/lane-line.git
-   git push -u origin main
-   ```
-
-3. On GitHub, open **Settings > Pages**. Under **Build and deployment**, set **Source** to **Deploy from a branch**, pick `main` and `/ (root)`, and save.
-4. After a minute, your app is live at `https://<your-username>.github.io/lane-line/`.
-
 ## Add it to your phone
 
 - **iPhone (Safari):** open the link, tap **Share**, then **Add to Home Screen**.
 - **Android (Chrome):** open the link, tap the menu, then **Install app** or **Add to Home screen**.
 
 After the first open, it works with no signal, which helps in bowling centers with bad reception.
-
-## Updating the app
-
-1. Edit `index.html`.
-2. In `sw.js`, change `VERSION` (for example `lane-line-v2`) so phones download the new copy.
-3. Commit and push. Open the app twice on your phone to pick up the update.
-
-Your saved numbers and logs stay put through updates, because they live in the phone's storage, not in the code.
 
 ## Sources
 
